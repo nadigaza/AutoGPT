@@ -1,0 +1,74 @@
+import os
+import openai
+import requests
+import pandas as pd
+from fastapi import FastAPI, HTTPException
+from langchain.llms import OpenAI
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+
+# Set up OpenAI API Key (Replace with your key)
+openai.api_key = "YOUR_OPENAI_API_KEY"
+
+# Create FastAPI app
+app = FastAPI()
+
+# Market Analysis Model
+market_analysis_prompt = PromptTemplate(
+    input_variables=["industry"],
+    template="Analyze the market for {industry}, identifying key trends, competitors, and potential opportunities."
+)
+
+market_analysis_chain = LLMChain(llm=OpenAI(), prompt=market_analysis_prompt)
+
+# Customer Support Model
+customer_support_prompt = PromptTemplate(
+    input_variables=["question"],
+    template="You are a customer support assistant for 'Star Plus' café. Answer the customer's inquiry professionally: {question}"
+)
+
+customer_support_chain = LLMChain(llm=OpenAI(), prompt=customer_support_prompt)
+
+# Sales Analysis Model
+def analyze_sales_data():
+    try:
+        # Load sales data (you can integrate a database here)
+        sales_data = pd.read_csv("sales_data.csv")
+        total_sales = sales_data["total"].sum()
+        best_selling_product = sales_data.groupby("product")["total"].sum().idxmax()
+        
+        return {
+            "total_sales": total_sales,
+            "best_selling_product": best_selling_product
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+# **🔹 API Endpoints**
+@app.get("/market_analysis")
+def get_market_analysis(industry: str):
+    """Analyze the market for the specified industry"""
+    try:
+        response = market_analysis_chain.run(industry=industry)
+        return {"market_analysis": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/customer_support")
+def customer_support(question: str):
+    """Customer support responses based on inquiries"""
+    try:
+        response = customer_support_chain.run(question=question)
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/sales_analysis")
+def sales_analysis():
+    """Analyze sales data and identify best-selling products"""
+    return analyze_sales_data()
+
+# **🔹 Run the Application**
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
